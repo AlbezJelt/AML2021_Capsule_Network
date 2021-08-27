@@ -127,3 +127,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Dataset
+EM Routing/tensorflow_datasets/patch_camelyon

@@ -287,7 +287,7 @@ def spread_loss(scores, y):
     # "The margin that we set is: 
     # margin = 0.2 + .79 * tf.sigmoid(tf.minimum(10.0, step / 50000.0 - 4))
     # where step is the training step. We trained with batch size of 64."
-    global_step = tf.to_float(tf.train.get_global_step())
+    global_step = tf.to_float(tf.compat.v1.train.get_global_step())
     m_min = 0.2
     m_delta = 0.79
     m = (m_min 
