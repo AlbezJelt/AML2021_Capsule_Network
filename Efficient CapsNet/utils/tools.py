@@ -26,7 +26,7 @@ def learn_scheduler(lr_dec, lr):
 def get_callbacks(tb_log_save_path, saved_model_path, lr_dec, lr):
     tb = tf.keras.callbacks.TensorBoard(log_dir=tb_log_save_path, histogram_freq=0)
 
-    model_checkpoint = tf.keras.callbacks.ModelCheckpoint(saved_model_path, monitor='val_Efficient_CapsNet_accuracy',
+    model_checkpoint = tf.keras.callbacks.ModelCheckpoint(saved_model_path, monitor='val_Original_CapsNet_accuracy',
                                            save_best_only=True, save_weights_only=True, verbose=1)
 
     lr_decay = tf.keras.callbacks.LearningRateScheduler(learn_scheduler(lr_dec, lr))
@@ -41,7 +41,7 @@ def marginLoss(y_true, y_pred):
     lbd = 0.5
     m_plus = 0.9
     m_minus = 0.1
-    
+
     L = y_true * tf.square(tf.maximum(0., m_plus - y_pred)) + \
     lbd * (1 - y_true) * tf.square(tf.maximum(0., y_pred - m_minus))
 
@@ -51,7 +51,7 @@ def marginLoss(y_true, y_pred):
 def multiAccuracy(y_true, y_pred):
     label_pred = tf.argsort(y_pred,axis=-1)[:,-2:]
     label_true = tf.argsort(y_true,axis=-1)[:,-2:]
-    
+ 
     acc = tf.reduce_sum(tf.cast(label_pred[:,:1]==label_true,tf.int8),axis=-1) + \
           tf.reduce_sum(tf.cast(label_pred[:,1:]==label_true,tf.int8),axis=-1)
     acc /= 2

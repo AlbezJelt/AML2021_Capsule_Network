@@ -3,6 +3,7 @@
     "MNIST_INPUT_SHAPE": [28,28,1], 
     "SMALLNORB_INPUT_SHAPE": [48,48,2],
     "MULTIMNIST_INPUT_SHAPE": [36,36,1],
+    "PATCH_CAMELYON_INPUT_SHAPE": [48,48,3],
     "lr": 5e-4,
     "lmd_gen": 0.392,
     "lr_dec": 0.97,

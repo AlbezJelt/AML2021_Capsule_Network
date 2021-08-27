@@ -19,7 +19,7 @@ from utils.layers import PrimaryCaps, FCCaps, Length
 from utils.tools import get_callbacks, marginLoss, multiAccuracy
 from utils.dataset import Dataset
 from utils import pre_process_multimnist
-from models import efficient_capsnet_graph_mnist, efficient_capsnet_graph_smallnorb, efficient_capsnet_graph_multimnist, original_capsnet_graph_mnist
+from models import efficient_capsnet_graph_mnist, efficient_capsnet_graph_smallnorb, efficient_capsnet_graph_multimnist, original_capsnet_graph_mnist, original_capsnet_graph_patch_camelyon
 import os
 import json
 from tqdm.notebook import tqdm
@@ -142,7 +142,7 @@ class EfficientCapsNet(Model):
             self.model_path = custom_path
         else:
             self.model_path = os.path.join(self.config['saved_model_dir'], f"efficient_capsnet_{self.model_name}.h5")
-        self.model_path_new_train = os.path.join(self.config['saved_model_dir'], f"efficient_capsnet{self.model_name}_new_train.h5")
+        self.model_path_new_train = os.path.join(self.config['saved_model_dir'], f"original_capsnet_{self.model_name}_new_train.h5")
         self.tb_path = os.path.join(self.config['tb_log_save_dir'], f"efficient_capsnet_{self.model_name}")
         self.load_graph()
     
@@ -166,7 +166,7 @@ class EfficientCapsNet(Model):
             self.model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=self.config['lr']),
               loss=[marginLoss, 'mse', 'mse'],
               loss_weights=[1., self.config['lmd_gen']/2,self.config['lmd_gen']/2],
-              metrics={'Efficient_CapsNet': multiAccuracy})
+              metrics={'Efficient_CapsNet': 'accuracy'})
             steps = 10*int(dataset.y_train.shape[0] / self.config['batch_size'])
         else:
             self.model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=self.config['lr']),
@@ -226,7 +226,10 @@ class CapsNet(Model):
 
     
     def load_graph(self):
-        self.model = original_capsnet_graph_mnist.build_graph(self.config['MNIST_INPUT_SHAPE'], self.mode, self.n_routing, self.verbose)
+        if self.model_name == 'MNIST':
+            self.model = original_capsnet_graph_mnist.build_graph(self.config['MNIST_INPUT_SHAPE'], self.mode, self.n_routing, self.verbose)
+        elif self.model_name == 'PATCH_CAMELYON':
+            self.model = original_capsnet_graph_patch_camelyon.build_graph(self.config['PATCH_CAMELYON_INPUT_SHAPE'], 2, self.mode, self.n_routing, self.verbose)
         
     def train(self, dataset=None, initial_epoch=0):
         callbacks = get_callbacks(self.tb_path, self.model_path_new_train, self.config['lr_dec'], self.config['lr'])
@@ -234,12 +237,12 @@ class CapsNet(Model):
         if dataset == None:
             dataset = Dataset(self.model_name, self.config_path)          
         dataset_train, dataset_val = dataset.get_tf_data()   
-
+        print(dataset_train)
 
         self.model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=self.config['lr']),
               loss=[marginLoss, 'mse'],
               loss_weights=[1., self.config['lmd_gen']],
-              metrics={'Original_CapsNet': 'accuracy'})
+              metrics=['accuracy'])
 
         print('-'*30 + f'{self.model_name} train' + '-'*30)
 

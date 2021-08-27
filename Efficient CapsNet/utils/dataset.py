@@ -18,7 +18,7 @@ import tensorflow as tf
 import tensorflow_datasets as tfds
 import matplotlib.pyplot as plt
 import os
-from utils import pre_process_mnist, pre_process_multimnist, pre_process_smallnorb
+from utils import pre_process_mnist, pre_process_multimnist, pre_process_smallnorb, pre_process_patch_camelyon
 import json
 
 
@@ -54,6 +54,10 @@ class Dataset(object):
         self.y_test = None
         self.class_names = None
         self.X_test_patch = None
+
+        self.tf_train = None
+        self.tf_valid = None
+
         self.load_config()
         self.get_dataset()
         
@@ -101,6 +105,22 @@ class Dataset(object):
             self.X_test, self.y_test = pre_process_multimnist.pre_process(self.X_test, self.y_test)
             self.class_names = list(range(10))
             print("[INFO] Dataset loaded!")
+        elif self.model_name == 'PATCH_CAMELYON':
+            # Import the dataset
+            (ds_train, ds_valid), ds_info = tfds.load(
+                'patch_camelyon',
+                data_dir=os.path.join(os.getcwd(), 'tensorflow_datasets'),
+                download=False,
+                split=['train', 'validation'],
+                shuffle_files=True,
+                as_supervised=False,
+                with_info=True)
+            
+            # Save directly dataset in tf.data.Dataset to save memory
+            self.tf_train = ds_train
+            self.tf_valid = ds_valid
+            self.class_names = ds_info.features['label'].names
+            print("[INFO] Dataset loaded!")
 
 
     def get_tf_data(self):
@@ -110,5 +130,7 @@ class Dataset(object):
             dataset_train, dataset_test = pre_process_smallnorb.generate_tf_data(self.X_train, self.y_train, self.X_test_patch, self.y_test, self.config['batch_size'])
         elif self.model_name == 'MULTIMNIST':
             dataset_train, dataset_test = pre_process_multimnist.generate_tf_data(self.X_train, self.y_train, self.X_test, self.y_test, self.config['batch_size'], self.config["shift_multimnist"])
+        elif self.model_name == 'PATCH_CAMELYON':
+            dataset_train, dataset_test = pre_process_patch_camelyon.generate_tf_data(self.tf_train, self.tf_valid, self.config['batch_size'])    
 
         return dataset_train, dataset_test
