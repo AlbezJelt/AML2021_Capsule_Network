@@ -16,18 +16,19 @@ import daiquiri
 import logging
 logger = daiquiri.getLogger(__name__)
 
+sys.argv = sys.argv[:1]
+
 flags = tf.app.flags
 
 # Need this line for flags to work with Jupyter
 # https://github.com/tensorflow/tensorflow/issues/17702
 flags.DEFINE_string('f', '', 'kernel')
 
-
 # ------------------------------------------------------------------------------
 # HYPERPARAMETERS
 # ------------------------------------------------------------------------------
 # set to 64 according to authors (https://openreview.net/forum?id=HJWLfGWRb)
-flags.DEFINE_integer('batch_size', 64, 'batch size in total across all gpus')
+flags.DEFINE_integer('batch_size', 32, 'batch size in total across all gpus')
 flags.DEFINE_integer('epoch', 2000, 'epoch')
 flags.DEFINE_integer('iter_routing', 3, 'number of iterations')
 flags.DEFINE_integer('num_gpus', 1, 'number of GPUs')
@@ -97,18 +98,18 @@ def setup_train_directories():
     train_dir = '{}/{}_{}/train'.format(save_dir, date_stamp, FLAGS.name)
 
     # Clear the train log directory
-    if FLAGS.reset is True and tf.gfile.Exists(train_dir):
+    if FLAGS.reset is True and tf.io.gfile.exists(train_dir):
         tf.gfile.DeleteRecursively(train_dir)
 
     # Create train directory
-    if not tf.gfile.Exists(train_dir):
+    if not tf.io.gfile.exists(train_dir):
         tf.gfile.MakeDirs(train_dir)
 
     # Set summary directory
     train_summary_dir = os.path.join(train_dir, 'summary')
 
     # Create summary directory
-    if not tf.gfile.Exists(train_summary_dir):
+    if not tf.io.gfile.exists(train_summary_dir):
         tf.gfile.MakeDirs(train_summary_dir)
 
     return train_dir, train_summary_dir

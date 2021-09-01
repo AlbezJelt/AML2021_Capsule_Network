@@ -1,15 +1,15 @@
-FROM tensorflow/tensorflow:1.14.0-gpu-py3-jupyter
+FROM nvcr.io/nvidia/tensorflow:21.07-tf1-py3
 
-RUN apt-get update 
+RUN apt-get update
 RUN apt-get install wget -y
 
-# Reconfiguring locales 
+# Reconfiguring locales
 # See https://serverfault.com/questions/54591/how-to-install-change-locale-on-debian
-RUN apt-get install -y locales 
-RUN locale-gen en_US.UTF-8
-RUN echo "export LC_ALL=en_US.UTF-8" >> ~/.bashrc
-RUN echo "export LANG=en_US.UTF-8" >> ~/.bashrc
-RUN echo "export LANGUAGE=en_US.UTF-8" >> ~/.bashrc
+# RUN apt-get install -y locales
+# RUN locale-gen en_US.UTF-8
+# RUN echo "export LC_ALL=en_US.UTF-8" >> ~/.bashrc
+# RUN echo "export LANG=en_US.UTF-8" >> ~/.bashrc
+# RUN echo "export LANGUAGE=en_US.UTF-8" >> ~/.bashrc
 
 RUN pip install --upgrade pip
 

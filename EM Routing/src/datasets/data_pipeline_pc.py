@@ -1,10 +1,9 @@
-import tensorflow as tf
-import numpy as np
-
 import os
 import re
 
-from config import FLAGS
+import tensorflow as tf
+from tensorflow.data.experimental import AUTOTUNE
+from src.utils.config import FLAGS
 
 
 def _parser(serialized_example):
@@ -17,27 +16,26 @@ def _parser(serialized_example):
       lab: label
     """
 
-
-	# From patch_camelyon feature.json
-	# features:
-	# 	- "id" <tf.string>: id of the sample
-	# 	- "image" <tf.string>: uint8-encoded pngs, stored as string
-	# 	- "label" <tf.int64>: class of the sample, {0, 1}
-    features = tf.parse_single_example(
+    # From patch_camelyon feature.json
+    # features:
+    # 	- "id" <tf.string>: id of the sample
+    # 	- "image" <tf.string>: uint8-encoded pngs, stored as string
+    # 	- "label" <tf.int64>: class of the sample, {0, 1}
+    features = tf.io.parse_single_example(
         serialized_example,
         features={
-            'id': tf.FixedLenFeature([], tf.string),
-            'image': tf.FixedLenFeature([], tf.string),
-            'label': tf.FixedLenFeature([], tf.int64)
+            'id': tf.io.FixedLenFeature([], tf.string),
+            'image': tf.io.FixedLenFeature([], tf.string),
+            'label': tf.io.FixedLenFeature([], tf.int64)
         })
 
     # Decode the image
     img = tf.image.decode_png(features['image'])
-    img = tf.cast(img, tf.float32)
+    # img = tf.cast(img, tf.float32)
 
     lab = tf.cast(features['label'], tf.int32)
 
-	# sample id isn't usefull
+    # sample id isn't usefull
     return img, lab
 
 
@@ -59,21 +57,16 @@ def _train_preprocess(img, lab):
       lab: label
     """
 
-    # Convert to grayscale to preserve orginal implementation
-    img = tf.image.rgb_to_grayscale(img)
-
-    # From there the preprocessing is left unchanged from Ashley Gritzman's implementation
-    img = img / 255.
-    img = tf.image.resize_images(img, [48, 48])
-    img = tf.image.per_image_standardization(img)
-    img = tf.random_crop(img, [32, 32, 1])
+    img = tf.image.resize(img, [48, 48])
+    img = tf.image.random_crop(img, [32, 32, 3])
     img = tf.image.random_brightness(img, max_delta=2.0)
     img = tf.image.random_contrast(img, lower=0.5, upper=1.5)
+    img = tf.image.per_image_standardization(img)
 
     return img, lab
 
 
-def _val_preprocess(img, lab):
+def _test_and_val_preprocess(img, lab):
     """Preprocessing for validation/testing.
 
     Preprocessing from Hinton et al. (2018) "Matrix capsules with EM routing."
@@ -91,15 +84,14 @@ def _val_preprocess(img, lab):
       lab: label
     """
 
-    img = img / 255.
-    img = tf.image.resize_images(img, [48, 48])
+    img = tf.image.resize(img, [48, 48])
+    img = tf.slice(img, [8, 8, 0], [32, 32, 3])
     img = tf.image.per_image_standardization(img)
-    img = tf.slice(img, [8, 8, 0], [32, 32, 1])
 
     return img, lab
 
 
-def input_fn(path, is_train: bool):
+def input_fn(path, mode='train'):
     """Input pipeline for PatchCamelyon using tf.data.
 
     Args:
@@ -108,13 +100,15 @@ def input_fn(path, is_train: bool):
       dataset: image tf.data.Dataset
     """
 
-    import re
-    if is_train:
+    if mode == 'train':
         CHUNK_RE = re.compile(
             r"patch_camelyon-train\.tfrecord-[0-9]+-of-[0-9]+")
-    else:
+    elif mode == 'validate':
         CHUNK_RE = re.compile(
             r"patch_camelyon-validation\.tfrecord-[0-9]+-of-[0-9]+")
+    elif mode == 'test':
+        CHUNK_RE = re.compile(
+            r"patch_camelyon-test\.tfrecord-[0-9]+-of-[0-9]+")
 
     chunk_files = [os.path.join(path, fname)
                    for fname in os.listdir(path)
@@ -125,13 +119,13 @@ def input_fn(path, is_train: bool):
 
     # 2. Map with the actual work (preprocessing, augmentation…) using multiple
     # parallel calls
-    dataset = dataset.map(_parser, num_parallel_calls=4)
-    if is_train:
+    dataset = dataset.map(_parser, num_parallel_calls=AUTOTUNE)
+    if mode == 'train':
         dataset = dataset.map(_train_preprocess,
-                              num_parallel_calls=FLAGS.num_threads)
+                              num_parallel_calls=AUTOTUNE)
     else:
-        dataset = dataset.map(_val_preprocess,
-                              num_parallel_calls=FLAGS.num_threads)
+        dataset = dataset.map(_test_and_val_preprocess,
+                              num_parallel_calls=AUTOTUNE)
 
     # 3. Shuffle (with a big enough buffer size)
     capacity = 2000 + 3 * FLAGS.batch_size
@@ -144,12 +138,12 @@ def input_fn(path, is_train: bool):
     dataset = dataset.repeat(count=FLAGS.epoch)
 
     # 6. Prefetch
-    dataset = dataset.prefetch(1)
+    dataset = dataset.prefetch(AUTOTUNE)
 
     return dataset
 
 
-def create_inputs_PC(path, is_train: bool):
+def create_inputs_PC(path, mode='train'):
     """Get a batch from the input pipeline.
 
     Args: 
@@ -159,7 +153,7 @@ def create_inputs_PC(path, is_train: bool):
     """
 
     # Create batched dataset
-    dataset = input_fn(path, is_train)
+    dataset = input_fn(path, mode)
 
     # Create one-shot iterator
     iterator = dataset.make_one_shot_iterator()
