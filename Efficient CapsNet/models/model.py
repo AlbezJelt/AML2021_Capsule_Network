@@ -19,7 +19,7 @@ from utils.layers import PrimaryCaps, FCCaps, Length
 from utils.tools import get_callbacks, marginLoss, multiAccuracy
 from utils.dataset import Dataset
 from utils import pre_process_multimnist
-from models import efficient_capsnet_graph_mnist, efficient_capsnet_graph_smallnorb, efficient_capsnet_graph_multimnist, original_capsnet_graph_mnist, original_capsnet_graph_patch_camelyon
+from models import efficient_capsnet_graph_mnist, efficient_capsnet_graph_smallnorb, efficient_capsnet_graph_multimnist, original_capsnet_graph_mnist, original_capsnet_graph_patch_camelyon, efficient_capsnet_graph_patch_camelyon
 import os
 import json
 from tqdm.notebook import tqdm
@@ -154,6 +154,8 @@ class EfficientCapsNet(Model):
             self.model = efficient_capsnet_graph_smallnorb.build_graph(self.config['SMALLNORB_INPUT_SHAPE'], self.mode, self.verbose)
         elif self.model_name == 'MULTIMNIST':
             self.model = efficient_capsnet_graph_multimnist.build_graph(self.config['MULTIMNIST_INPUT_SHAPE'], self.mode, self.verbose)
+        elif self.model_name == 'PATCH_CAMELYON':
+            self.model = efficient_capsnet_graph_patch_camelyon.build_graph(self.config['PATCH_CAMELYON_INPUT_SHAPE'], self.mode, self.verbose)
             
     def train(self, dataset=None, initial_epoch=0):
         callbacks = get_callbacks(self.tb_path, self.model_path_new_train, self.config['lr_dec'], self.config['lr'])

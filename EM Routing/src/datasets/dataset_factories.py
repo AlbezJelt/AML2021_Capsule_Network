@@ -1,3 +1,5 @@
+import pathlib
+
 from src.utils.config import FLAGS
 from src.datasets import data_pipeline_pc as data_pc
 from src.models import model as mod
@@ -8,8 +10,15 @@ from src.models import model as mod
 
 
 def get_dataset_path(dataset_name: str):
-    # Patch camelyon dataset path
-    options = {'PatchCamelyon': 'tensorflow_datasets/patch_camelyon/2.0.0'}
+    # Get patch camelyon dataset path
+
+    # Path for this file
+    this_file_path = pathlib.Path(__file__).parent.resolve()
+
+    # Go up to project root directory, ../../../
+    base_path = this_file_path.parent.parent.parent
+
+    options = {'PatchCamelyon': f'{base_path}/data/tensorflow_datasets/patch_camelyon/2.0.0'}
     path = FLAGS.storage + options[dataset_name]
     return path
 

@@ -11,6 +11,7 @@ import os
 import sys
 import re
 import time
+import pathlib
 
 import daiquiri
 import logging
@@ -34,16 +35,9 @@ flags.DEFINE_integer('iter_routing', 3, 'number of iterations')
 flags.DEFINE_integer('num_gpus', 1, 'number of GPUs')
 flags.DEFINE_float('epsilon', 1e-9, 'epsilon')
 flags.DEFINE_float('lrn_rate', 3e-3, 'learning rate to use in Adam optimiser')
-flags.DEFINE_float('val_prop', 0.1,
-                   'proportion of test dataset to use for validation')
 flags.DEFINE_boolean('weight_reg', False,
                      'train with regularization of weights')
 flags.DEFINE_string('norm', 'norm2', 'norm type')
-flags.DEFINE_integer('num_threads', 8,
-                     'number of parallel calls in the input pipeline')
-flags.DEFINE_string('dataset', 'PatchCamelyon',
-                    '''dataset name: currently only "smallNORB" supported, feel
-										free to add your own''')
 flags.DEFINE_float('final_lambda', 0.01, 'final lambda in EM routing')
 
 
@@ -76,9 +70,11 @@ flags.DEFINE_string('ckpt_name', None,
 											dir; name to load specific ckpt''')
 flags.DEFINE_string('params_path', None, 'path to JSON containing parameters')
 
-LOCAL_STORAGE = './'
+this_file_path = pathlib.Path(__file__).parent.resolve()
+LOCAL_STORAGE = this_file_path.parent.parent
 flags.DEFINE_string('storage', LOCAL_STORAGE,
                     'directory where logs and data are stored')
+                    
 flags.DEFINE_string('db_name', 'capsules_ex1',
                     'Name of the DB for mongo for sacred')
 
@@ -119,7 +115,7 @@ def setup_train_directories():
 # SETUP LOGGER
 # ------------------------------------------------------------------------------
 def setup_logger(logger_dir, name="logger"):
-    os.environ['TZ'] = 'Africa/Johannesburg'
+    os.environ['TZ'] = 'Europe/Rome'
     time.tzset()
     daiquiri_formatter = daiquiri.formatter.ColorFormatter(
         fmt="%(asctime)s %(color)s%(levelname)s: %(message)s%(color_stop)s",
@@ -136,39 +132,27 @@ def setup_logger(logger_dir, name="logger"):
 # ------------------------------------------------------------------------------
 # LOAD OR SAVE HYPERPARAMETERS
 # ------------------------------------------------------------------------------
-def load_or_save_hyperparams(train_dir=None):
+def load_or_save_hyperparams(train_dir, load_dir=None):
 
     # Load parameters from file
     # params_path is given in the case that run a new training using existing
     # parameters
     # load_dir is given in the case of testing or continuing training
-    if FLAGS.params_path or FLAGS.load_dir:
+    if load_dir:
 
-        if FLAGS.params_path:
-            params_path = os.path.abspath(FLAGS.params_path)
-        elif FLAGS.load_dir:
-            params_path = os.path.join(FLAGS.load_dir, "train",
-                                       "params", "params.json")
-            params_path = os.path.abspath(params_path)
+        params_path = os.path.join(load_dir, "train",
+                                    "params", "params.json")
+        params_path = os.path.abspath(params_path)
 
         with open(params_path, 'r') as params_file:
             params = json.load(params_file)
-
-            # Get list of flags that were specifically set in command line
-            cl_args = sys.argv[1:]
-            specified_flags = [re.search('--(.*)=', s).group(1)
-                               for s in cl_args]
-
             for name, value in params.items():
-                # ignore flags that were specifically set./run in command line
-                if name in specified_flags:
-                    pass
-                else:
-                    FLAGS.__flags[name].value = value
+                FLAGS.__flags[name].value = value
+
         logger.info("Loaded parameters from file: {}".format(params_path))
 
     # Save parameters to file
-    elif FLAGS.mode == 'train':
+    else:
         params_dir_path = os.path.join(train_dir, "params")
         os.makedirs(params_dir_path, exist_ok=True)
         params_file_path = os.path.join(params_dir_path, "params.json")

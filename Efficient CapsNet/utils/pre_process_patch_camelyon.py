@@ -1,81 +1,145 @@
+import os
+from utils.pre_process_smallnorb import PATCH_SMALLNORB
+
 import numpy as np
 import tensorflow as tf
-import os
+from tensorflow.data import AUTOTUNE
 from tqdm.notebook import tqdm
 
-
 # constants
-INPUT_SHAPE = 48
-PATCH_PCAMELYON = 32
-N_CLASSES = 5
+INPUT_SHAPE = 96
+SCALE_PATCH_CAMELYON = 64
+PATCH_PATCH_CAMELYON = 48
+N_CLASSES = 2
 MAX_DELTA = 2.0
 LOWER_CONTRAST = 0.5
 UPPER_CONTRAST = 1.5
-PARALLEL_INPUT_CALLS = 16
 
-# Unused, pass directly with tf.data.Dataset
+
 def pre_process(ds):
-    SAMPLES = int(ds.cardinality())
+    return ds['image'], ds['label']
 
-    X = np.empty((SAMPLES, INPUT_SHAPE, INPUT_SHAPE, 3))
-    y = np.empty((SAMPLES,))
-
-    with tf.device("/cpu:0"):    
-        for index, d in tqdm(enumerate(ds.batch(1))):           
-            img = tf.image.resize(d['image'] , [48, 48])
-            X[index, :, :, :] = img / 255.0
-            y[index] = d['label']
-    return X, y
 
 def normalize(image, label):
     label = tf.one_hot(label, 2)
     return tf.image.per_image_standardization(image), tf.cast(label, tf.float32)
 
-def rescale(tensor):
+
+def rescale(x, y):
     # return tf.image.resize(tensor['image'] , [48, 48]), tf.cast(tensor['label'], tf.float32)
-    return tf.image.resize(tensor['image'] , [48, 48]), tensor['label']
-# ?
-def test_patches(x, y, config):
-    res = (config['scale_smallnorb'] - config['patch_smallnorb']) // 2
-    return x[:,res:-res,res:-res,:], y
+    with tf.device("/cpu:0"):
+        x = tf.image.resize(
+            x, [SCALE_PATCH_CAMELYON, SCALE_PATCH_CAMELYON])
+    return x, y
+    # return tf.image.resize(tensor['image'] , [48, 48]), tensor['label']
+
+
+def test_patches(x, y):
+    x = tf.image.resize_with_crop_or_pad(
+        x, PATCH_PATCH_CAMELYON, PATCH_PATCH_CAMELYON)
+    return x, y
+
 
 def generator(image, label):
     return (image, label), (label, image)
 
+
 def random_patches(x, y):
-    return tf.image.random_crop(x, [PATCH_PCAMELYON, PATCH_PCAMELYON, 3]), y
+    return tf.image.random_crop(x, [PATCH_PATCH_CAMELYON, PATCH_PATCH_CAMELYON, 3]), y
+
 
 def random_brightness(x, y):
     return tf.image.random_brightness(x, max_delta=MAX_DELTA), y
 
+
 def random_contrast(x, y):
     return tf.image.random_contrast(x, lower=LOWER_CONTRAST, upper=UPPER_CONTRAST), y
 
-def generate_tf_data(dataset_train, dataset_test, batch_size):
-    
-    # Test set
-    # dataset_train = dataset_train.map(random_patches,
-    #     num_parallel_calls=PARALLEL_INPUT_CALLS)
-    dataset_train = dataset_train.map(rescale, num_parallel_calls=PARALLEL_INPUT_CALLS)
-    dataset_train = dataset_train.map(normalize, num_parallel_calls=PARALLEL_INPUT_CALLS)
-    dataset_train = dataset_train.map(random_brightness,
-        num_parallel_calls=PARALLEL_INPUT_CALLS)
-    dataset_train = dataset_train.map(random_contrast,
-        num_parallel_calls=PARALLEL_INPUT_CALLS)
-    # Random cropping is implemented as a layer
-    # dataset_train = dataset_train.map(random_patches, num_parallel_calls=PARALLEL_INPUT_CALLS)
-    dataset_train = dataset_train.map(generator,
-        num_parallel_calls=PARALLEL_INPUT_CALLS)
-    dataset_train = dataset_train.batch(batch_size)
-    dataset_train = dataset_train.prefetch(-1)
 
-    # Validation set
-    dataset_test = dataset_test.cache()
-    dataset_test = dataset_test.map(rescale, num_parallel_calls=PARALLEL_INPUT_CALLS)
-    dataset_test = dataset_test.map(normalize, num_parallel_calls=PARALLEL_INPUT_CALLS)
+def to_grayscale(x, y):
+    return tf.image.rgb_to_grayscale(x), y
+
+
+def generate_tf_data(dataset_train, dataset_test, batch_size):
+
+    # =================== TRAINING SET ========================================
+
+    # Extract image and label from tf.Dataset
+    dataset_train = dataset_train.map(
+        pre_process, num_parallel_calls=AUTOTUNE)
+
+    # Rescale to SCALE_PATCH_CAMELYON
+    dataset_train = dataset_train.map(
+        rescale, num_parallel_calls=AUTOTUNE)
+
+    # Random crop to PATCH_PATCH_CAMELYON
+    dataset_train = dataset_train.map(random_patches,
+                                      num_parallel_calls=AUTOTUNE)
+
+    # Apply random brightness
+    dataset_train = dataset_train.map(random_brightness,
+                                      num_parallel_calls=AUTOTUNE)
+
+    # Apply random contrast
+    dataset_train = dataset_train.map(random_contrast,
+                                      num_parallel_calls=AUTOTUNE)
+
+    # Convert to grayscale
+    dataset_train = dataset_train.map(
+        to_grayscale, num_parallel_calls=AUTOTUNE)
+
+    # Standardize the image
+    dataset_train = dataset_train.map(
+        normalize, num_parallel_calls=AUTOTUNE)
+
+    # Create the sample (image, label), (label, image)
+    dataset_train = dataset_train.map(generator,
+                                      num_parallel_calls=AUTOTUNE)
+
+    # Batch
+    dataset_train = dataset_train.batch(batch_size)
+
+    # Prefetch
+    dataset_train = dataset_train.prefetch(AUTOTUNE)
+
+    # =========================================================================
+
+    # =================== VALIDATION SET ======================================
+
+    # Extract image and label from tf.Dataset
+    dataset_test = dataset_test.map(
+        pre_process, num_parallel_calls=AUTOTUNE)
+
+    # Rescale to SCALE_PATCH_CAMELYON
+    dataset_test = dataset_test.map(
+        rescale, num_parallel_calls=AUTOTUNE)
+
+    # Center crop to PATCH_PATCH_CAMELYON
+    dataset_test = dataset_test.map(
+        test_patches, num_parallel_calls=AUTOTUNE)
+
+    # Convert to grayscale
+    dataset_test = dataset_test.map(
+        to_grayscale, num_parallel_calls=AUTOTUNE)
+
+    # Standardize the image
+    dataset_test = dataset_test.map(
+        normalize, num_parallel_calls=AUTOTUNE)
+
+    # Create the sample (image, label), (label, image)
     dataset_test = dataset_test.map(generator,
-        num_parallel_calls=PARALLEL_INPUT_CALLS)
+                                    num_parallel_calls=AUTOTUNE)
+
+    # Cache the data in memory. This dataset is smaller compared to the
+    # training so it can be cached in memory for faster validation
+    dataset_test = dataset_test.cache()
+
+    # Batch
     dataset_test = dataset_test.batch(1)
-    dataset_test = dataset_test.prefetch(-1)
-    
+
+    # Prefetch
+    dataset_test = dataset_test.prefetch(AUTOTUNE)
+
+    # =========================================================================
+
     return dataset_train, dataset_test

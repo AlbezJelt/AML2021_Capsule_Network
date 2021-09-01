@@ -20,21 +20,22 @@ import matplotlib.pyplot as plt
 import os
 from utils import pre_process_mnist, pre_process_multimnist, pre_process_smallnorb, pre_process_patch_camelyon
 import json
+import pathlib
 
 
 class Dataset(object):
     """
     A class used to share common dataset functions and attributes.
-    
+
     ...
-    
+
     Attributes
     ----------
     model_name: str
         name of the model (Ex. 'MNIST')
     config_path: str
         path configuration file
-    
+
     Methods
     -------
     load_config():
@@ -44,6 +45,7 @@ class Dataset(object):
     get_tf_data():
         get a tf.data.Dataset object of the loaded dataset. 
     """
+
     def __init__(self, model_name, config_path='config.json'):
         self.model_name = model_name
         self.config_path = config_path
@@ -60,7 +62,6 @@ class Dataset(object):
 
         self.load_config()
         self.get_dataset()
-        
 
     def load_config(self):
         """
@@ -69,68 +70,92 @@ class Dataset(object):
         with open(self.config_path) as json_data_file:
             self.config = json.load(json_data_file)
 
-
     def get_dataset(self):
         if self.model_name == 'MNIST':
-            (self.X_train, self.y_train), (self.X_test, self.y_test) = tf.keras.datasets.mnist.load_data(path=self.config['mnist_path'])
+            (self.X_train, self.y_train), (self.X_test,
+                                           self.y_test) = tf.keras.datasets.mnist.load_data(path=self.config['mnist_path'])
             # prepare the data
-            self.X_train, self.y_train = pre_process_mnist.pre_process(self.X_train, self.y_train)
-            self.X_test, self.y_test = pre_process_mnist.pre_process(self.X_test, self.y_test)
+            self.X_train, self.y_train = pre_process_mnist.pre_process(
+                self.X_train, self.y_train)
+            self.X_test, self.y_test = pre_process_mnist.pre_process(
+                self.X_test, self.y_test)
             self.class_names = list(range(10))
             print("[INFO] Dataset loaded!")
+
         elif self.model_name == 'SMALLNORB':
-                    # import the datatset
+            # import the datatset
             (ds_train, ds_test), ds_info = tfds.load(
                 'smallnorb',
                 split=['train', 'test'],
                 shuffle_files=True,
                 as_supervised=False,
                 with_info=True)
-            self.X_train, self.y_train = pre_process_smallnorb.pre_process(ds_train)
-            self.X_test, self.y_test = pre_process_smallnorb.pre_process(ds_test)
+            self.X_train, self.y_train = pre_process_smallnorb.pre_process(
+                ds_train)
+            self.X_test, self.y_test = pre_process_smallnorb.pre_process(
+                ds_test)
 
-            self.X_train, self.y_train = pre_process_smallnorb.standardize(self.X_train, self.y_train)
-            self.X_train, self.y_train = pre_process_smallnorb.rescale(self.X_train, self.y_train, self.config)
-            self.X_test, self.y_test = pre_process_smallnorb.standardize(self.X_test, self.y_test)
-            self.X_test, self.y_test = pre_process_smallnorb.rescale(self.X_test, self.y_test, self.config) 
-            self.X_test_patch, self.y_test = pre_process_smallnorb.test_patches(self.X_test, self.y_test, self.config)
+            self.X_train, self.y_train = pre_process_smallnorb.standardize(
+                self.X_train, self.y_train)
+            self.X_train, self.y_train = pre_process_smallnorb.rescale(
+                self.X_train, self.y_train, self.config)
+            self.X_test, self.y_test = pre_process_smallnorb.standardize(
+                self.X_test, self.y_test)
+            self.X_test, self.y_test = pre_process_smallnorb.rescale(
+                self.X_test, self.y_test, self.config)
+            self.X_test_patch, self.y_test = pre_process_smallnorb.test_patches(
+                self.X_test, self.y_test, self.config)
             self.class_names = ds_info.features['label_category'].names
             print("[INFO] Dataset loaded!")
+
         elif self.model_name == 'MULTIMNIST':
-            (self.X_train, self.y_train), (self.X_test, self.y_test) = tf.keras.datasets.mnist.load_data(path=self.config['mnist_path'])
+            (self.X_train, self.y_train), (self.X_test,
+                                           self.y_test) = tf.keras.datasets.mnist.load_data(path=self.config['mnist_path'])
             # prepare the data
-            self.X_train = pre_process_multimnist.pad_dataset(self.X_train, self.config["pad_multimnist"])
-            self.X_test = pre_process_multimnist.pad_dataset(self.X_test, self.config["pad_multimnist"])
-            self.X_train, self.y_train = pre_process_multimnist.pre_process(self.X_train, self.y_train)
-            self.X_test, self.y_test = pre_process_multimnist.pre_process(self.X_test, self.y_test)
+            self.X_train = pre_process_multimnist.pad_dataset(
+                self.X_train, self.config["pad_multimnist"])
+            self.X_test = pre_process_multimnist.pad_dataset(
+                self.X_test, self.config["pad_multimnist"])
+            self.X_train, self.y_train = pre_process_multimnist.pre_process(
+                self.X_train, self.y_train)
+            self.X_test, self.y_test = pre_process_multimnist.pre_process(
+                self.X_test, self.y_test)
             self.class_names = list(range(10))
             print("[INFO] Dataset loaded!")
+
         elif self.model_name == 'PATCH_CAMELYON':
+            # Get the datadir path
+            this_file_path = pathlib.Path(__file__).parent.resolve()
+            base_path = this_file_path.parent.parent
+
             # Import the dataset
-            (ds_train, ds_valid), ds_info = tfds.load(
+            (ds_train, ds_valid, ds_test), ds_info = tfds.load(
                 'patch_camelyon',
-                data_dir=os.path.join(os.getcwd(), 'tensorflow_datasets'),
+                data_dir=f'{base_path}/data/tensorflow_datasets',
                 download=False,
-                split=['train', 'validation'],
+                split=['train', 'validation', 'test'],
                 shuffle_files=True,
                 as_supervised=False,
                 with_info=True)
-            
+
             # Save directly dataset in tf.data.Dataset to save memory
             self.tf_train = ds_train
             self.tf_valid = ds_valid
             self.class_names = ds_info.features['label'].names
             print("[INFO] Dataset loaded!")
 
-
     def get_tf_data(self):
         if self.model_name == 'MNIST':
-            dataset_train, dataset_test = pre_process_mnist.generate_tf_data(self.X_train, self.y_train, self.X_test, self.y_test, self.config['batch_size'])
+            dataset_train, dataset_test = pre_process_mnist.generate_tf_data(
+                self.X_train, self.y_train, self.X_test, self.y_test, self.config['batch_size'])
         elif self.model_name == 'SMALLNORB':
-            dataset_train, dataset_test = pre_process_smallnorb.generate_tf_data(self.X_train, self.y_train, self.X_test_patch, self.y_test, self.config['batch_size'])
+            dataset_train, dataset_test = pre_process_smallnorb.generate_tf_data(
+                self.X_train, self.y_train, self.X_test_patch, self.y_test, self.config['batch_size'])
         elif self.model_name == 'MULTIMNIST':
-            dataset_train, dataset_test = pre_process_multimnist.generate_tf_data(self.X_train, self.y_train, self.X_test, self.y_test, self.config['batch_size'], self.config["shift_multimnist"])
+            dataset_train, dataset_test = pre_process_multimnist.generate_tf_data(
+                self.X_train, self.y_train, self.X_test, self.y_test, self.config['batch_size'], self.config["shift_multimnist"])
         elif self.model_name == 'PATCH_CAMELYON':
-            dataset_train, dataset_test = pre_process_patch_camelyon.generate_tf_data(self.tf_train, self.tf_valid, self.config['batch_size'])    
+            dataset_train, dataset_test = pre_process_patch_camelyon.generate_tf_data(
+                self.tf_train, self.tf_valid, self.config['batch_size'])
 
         return dataset_train, dataset_test

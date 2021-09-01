@@ -22,7 +22,20 @@ logger = daiquiri.getLogger(__name__)
 
 class EMNet(object):
 
-    def __init__(self, model_name) -> None:
+    def __init__(self, model_name, load_dir=None) -> None:
+        """CapsNet with EM routing
+
+        Encapsulates all the operation needed to build and train a CapsNet using EM as routing mechanism.
+
+        Args:
+            model_name: name of the model to initialize. All the information to load the model are stored in EM routing/src/datasets/dataset_factories.py
+            load_dir=None: path of the directory containing the model to continue training. Ex: 'EM routing/logs/PatchCamelyon/20210901'
+        
+        Model parameters
+            All model parameters are found in EM routing/src/utils/configs.py
+            - 
+        """
+        self.load_dir = load_dir
         self.model_name = model_name
         # Set reproduciable random seed
         tf.compat.v1.set_random_seed(1234)
@@ -50,6 +63,9 @@ class EMNet(object):
             self.model_name, mode="validate")
 
     def build_model_graph(self):
+        """Build the model graph (train and validation)
+        """
+
         # ----------------------------------------------------------------------------
         # GRAPH - TRAIN
         # ----------------------------------------------------------------------------
@@ -206,7 +222,7 @@ class EMNet(object):
             global_step = tf.compat.v1.train.get_or_create_global_step()
 
             self.num_batches_val = int(
-                self.dataset_size_val / FLAGS.batch_size * FLAGS.val_prop)
+                self.dataset_size_val / FLAGS.batch_size)
 
             # Get data
             input_dict = self.create_inputs_val()
@@ -289,7 +305,8 @@ class EMNet(object):
             self.val_summary = tf.compat.v1.summary.merge_all()
 
     def train(self):
-
+        """Start the training and validation session, than execute the train loop.
+        """
         # ****************************************************************************
         # SESSIONS
         # ****************************************************************************
@@ -315,9 +332,9 @@ class EMNet(object):
 
             # Restore previous checkpoint
             # AG 26/09/2018: where should this go???
-            if FLAGS.load_dir is not None:
+            if self.load_dir is not None:
                 load_dir_checkpoint = os.path.join(
-                    FLAGS.load_dir, "train", "checkpoint")
+                    self.load_dir, "train", "checkpoint")
                 prev_step = load_training(
                     self.saver, sess_train, load_dir_checkpoint)
             else:

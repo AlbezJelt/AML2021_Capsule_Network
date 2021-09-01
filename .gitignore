@@ -129,7 +129,7 @@ dmypy.json
 .pyre/
 
 # Dataset
-EM Routing/tensorflow_datasets/patch_camelyon
-Efficient CapsNet/tensorflow_datasets/patch_camelyon
+data/tensorflow_dataset/patch_camelyon
 
 Efficient CapsNet/logs
+EM Routing/logs

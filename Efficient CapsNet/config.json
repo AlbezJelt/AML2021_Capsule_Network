@@ -3,7 +3,6 @@
     "MNIST_INPUT_SHAPE": [28,28,1], 
     "SMALLNORB_INPUT_SHAPE": [48,48,2],
     "MULTIMNIST_INPUT_SHAPE": [36,36,1],
-    "PATCH_CAMELYON_INPUT_SHAPE": [48,48,3],
     "lr": 5e-4,
     "lmd_gen": 0.392,
     "lr_dec": 0.97,
@@ -16,5 +15,8 @@
     "patch_smallnorb": 48,
     "n_overlay_multimnist": 1000,
     "shift_multimnist": 6,
-    "pad_multimnist": 4
+    "pad_multimnist": 4,
+    "PATCH_CAMELYON_INPUT_SHAPE": [48,48,1],
+    "scale_patch_camelyon": 64,
+    "patch_patch_camelyon": 48
 }
