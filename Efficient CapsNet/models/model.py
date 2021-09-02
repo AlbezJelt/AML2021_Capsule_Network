@@ -18,7 +18,7 @@ import tensorflow as tf
 from utils.layers import PrimaryCaps, FCCaps, Length
 from utils.tools import get_callbacks, marginLoss, multiAccuracy
 from utils.dataset import Dataset
-from utils import pre_process_multimnist
+from utils import pre_process_multimnist, pre_process_patch_camelyon
 from models import efficient_capsnet_graph_mnist, efficient_capsnet_graph_smallnorb, efficient_capsnet_graph_multimnist, original_capsnet_graph_mnist, original_capsnet_graph_patch_camelyon, efficient_capsnet_graph_patch_camelyon
 import os
 import json
@@ -28,9 +28,9 @@ from tqdm.notebook import tqdm
 class Model(object):
     """
     A class used to share common model functions and attributes.
-    
+
     ...
-    
+
     Attributes
     ----------
     model_name: str
@@ -40,7 +40,7 @@ class Model(object):
     config_path: str
         path configuration file
     verbose: bool
-    
+
     Methods
     -------
     load_config():
@@ -54,6 +54,7 @@ class Model(object):
     save_graph_weights():
         save model weights
     """
+
     def __init__(self, model_name, mode='test', config_path='config.json', verbose=True):
         self.model_name = model_name
         self.model = None
@@ -63,59 +64,68 @@ class Model(object):
         self.verbose = verbose
         self.load_config()
 
-
     def load_config(self):
         """
         Load config file
         """
         with open(self.config_path) as json_data_file:
             self.config = json.load(json_data_file)
-    
 
     def load_graph_weights(self):
         try:
             self.model.load_weights(self.model_path)
         except Exception as e:
             print("[ERRROR] Graph Weights not found")
-            
-        
+
     def predict(self, dataset_test):
         return self.model.predict(dataset_test)
-    
 
     def evaluate(self, X_test, y_test):
         print('-'*30 + f'{self.model_name} Evaluation' + '-'*30)
-        if self.model_name == "MULTIMNIST":
-            dataset_test = pre_process_multimnist.generate_tf_data_test(X_test, y_test, self.config["shift_multimnist"], n_multi=self.config['n_overlay_multimnist'])
-            acc = []
-            for X,y in tqdm(dataset_test,total=len(X_test)):
-                y_pred,X_gen1,X_gen2 = self.model.predict(X)
-                acc.append(multiAccuracy(y, y_pred))
-            acc = np.mean(acc)
+
+        if type(X_test) == tf.data.Dataset:
+            if self.model_name == "PATCH_CAMELYON":
+                testset, y_test = pre_process_patch_camelyon.generate_tf_test_data(
+                    X_test)
+                y_pred, X_gen = self.model.predict(testset)
+                acc = np.sum(np.argmax(y_pred, 1) ==
+                             np.argmax(y_test, 1))/y_test.shape[0]
+
         else:
-            y_pred, X_gen =  self.model.predict(X_test)
-            acc = np.sum(np.argmax(y_pred, 1) == np.argmax(y_test, 1))/y_test.shape[0]
+            if self.model_name == "MULTIMNIST":
+                dataset_test = pre_process_multimnist.generate_tf_data_test(
+                    X_test, y_test, self.config["shift_multimnist"], n_multi=self.config['n_overlay_multimnist'])
+                acc = []
+                for X, y in tqdm(dataset_test, total=len(X_test)):
+                    y_pred, X_gen1, X_gen2 = self.model.predict(X)
+                    acc.append(multiAccuracy(y, y_pred))
+                acc = np.mean(acc)
+            else:
+                y_pred, X_gen = self.model.predict(X_test)
+                acc = np.sum(np.argmax(y_pred, 1) ==
+                             np.argmax(y_test, 1))/y_test.shape[0]
+
         test_error = 1 - acc
         print('Test acc:', acc)
         print(f"Test error [%]: {(test_error):.4%}")
         if self.model_name == "MULTIMNIST":
-            print(f"N° misclassified images: {int(test_error*len(y_test)*self.config['n_overlay_multimnist'])} out of {len(y_test)*self.config['n_overlay_multimnist']}")
+            print(
+                f"N° misclassified images: {int(test_error*len(y_test)*self.config['n_overlay_multimnist'])} out of {len(y_test)*self.config['n_overlay_multimnist']}")
         else:
-            print(f"N° misclassified images: {int(test_error*len(y_test))} out of {len(y_test)}")
-
+            print(
+                f"N° misclassified images: {int(test_error*len(y_test))} out of {len(y_test)}")
 
     def save_graph_weights(self):
         self.model.save_weights(self.model_path)
-
 
 
 class EfficientCapsNet(Model):
     """
     A class used to manage an Efficiet-CapsNet model. 'model_name' and 'mode' define the particular architecure and modality of the 
     generated network.
-    
+
     ...
-    
+
     Attributes
     ----------
     model_name: str
@@ -127,7 +137,7 @@ class EfficientCapsNet(Model):
     custom_path: str
         custom weights path
     verbose: bool
-    
+
     Methods
     -------
     load_graph():
@@ -136,65 +146,74 @@ class EfficientCapsNet(Model):
         train the constructed network with a given dataset. All train hyperparameters are defined in the configuration file
 
     """
+
     def __init__(self, model_name, mode='test', config_path='config.json', custom_path=None, verbose=True):
         Model.__init__(self, model_name, mode, config_path, verbose)
         if custom_path != None:
             self.model_path = custom_path
         else:
-            self.model_path = os.path.join(self.config['saved_model_dir'], f"efficient_capsnet_{self.model_name}.h5")
-        self.model_path_new_train = os.path.join(self.config['saved_model_dir'], f"original_capsnet_{self.model_name}_new_train.h5")
-        self.tb_path = os.path.join(self.config['tb_log_save_dir'], f"efficient_capsnet_{self.model_name}")
+            self.model_path = os.path.join(
+                self.config['saved_model_dir'], f"efficient_capsnet_{self.model_name}.h5")
+        self.model_path_new_train = os.path.join(
+            self.config['saved_model_dir'], f"original_capsnet_{self.model_name}_new_train.h5")
+        self.tb_path = os.path.join(
+            self.config['tb_log_save_dir'], f"efficient_capsnet_{self.model_name}")
         self.load_graph()
-    
 
     def load_graph(self):
         if self.model_name == 'MNIST':
-            self.model = efficient_capsnet_graph_mnist.build_graph(self.config['MNIST_INPUT_SHAPE'], self.mode, self.verbose)
+            self.model = efficient_capsnet_graph_mnist.build_graph(
+                self.config['MNIST_INPUT_SHAPE'], self.mode, self.verbose)
         elif self.model_name == 'SMALLNORB':
-            self.model = efficient_capsnet_graph_smallnorb.build_graph(self.config['SMALLNORB_INPUT_SHAPE'], self.mode, self.verbose)
+            self.model = efficient_capsnet_graph_smallnorb.build_graph(
+                self.config['SMALLNORB_INPUT_SHAPE'], self.mode, self.verbose)
         elif self.model_name == 'MULTIMNIST':
-            self.model = efficient_capsnet_graph_multimnist.build_graph(self.config['MULTIMNIST_INPUT_SHAPE'], self.mode, self.verbose)
+            self.model = efficient_capsnet_graph_multimnist.build_graph(
+                self.config['MULTIMNIST_INPUT_SHAPE'], self.mode, self.verbose)
         elif self.model_name == 'PATCH_CAMELYON':
-            self.model = efficient_capsnet_graph_patch_camelyon.build_graph(self.config['PATCH_CAMELYON_INPUT_SHAPE'], self.mode, self.verbose)
-            
+            self.model = efficient_capsnet_graph_patch_camelyon.build_graph(
+                self.config['PATCH_CAMELYON_INPUT_SHAPE'], self.mode, self.verbose)
+
     def train(self, dataset=None, initial_epoch=0):
-        callbacks = get_callbacks(self.tb_path, self.model_path_new_train, self.config['lr_dec'], self.config['lr'])
+        callbacks = get_callbacks(
+            self.tb_path, self.model_path_new_train, self.config['lr_dec'], self.config['lr'])
 
         if dataset == None:
             dataset = Dataset(self.model_name, self.config_path)
-        dataset_train, dataset_val = dataset.get_tf_data()    
+        dataset_train, dataset_val = dataset.get_tf_data()
 
         if self.model_name == 'MULTIMNIST':
             self.model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=self.config['lr']),
-              loss=[marginLoss, 'mse', 'mse'],
-              loss_weights=[1., self.config['lmd_gen']/2,self.config['lmd_gen']/2],
-              metrics={'Efficient_CapsNet': 'accuracy'})
-            steps = 10*int(dataset.y_train.shape[0] / self.config['batch_size'])
+                               loss=[marginLoss, 'mse', 'mse'],
+                               loss_weights=[
+                                   1., self.config['lmd_gen']/2, self.config['lmd_gen']/2],
+                               metrics={'Efficient_CapsNet': 'accuracy'})
+            steps = 10 * \
+                int(dataset.y_train.shape[0] / self.config['batch_size'])
         else:
             self.model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=self.config['lr']),
-              loss=[marginLoss, 'mse'],
-              loss_weights=[1., self.config['lmd_gen']],
-              metrics={'Efficient_CapsNet': 'accuracy'})
-            steps=None
+                               loss=[marginLoss, 'mse'],
+                               loss_weights=[1., self.config['lmd_gen']],
+                               metrics={'Efficient_CapsNet': 'accuracy'})
+            steps = None
 
         print('-'*30 + f'{self.model_name} train' + '-'*30)
 
         history = self.model.fit(dataset_train,
-          epochs=self.config[f'epochs'], steps_per_epoch=steps,
-          validation_data=(dataset_val), batch_size=self.config['batch_size'], initial_epoch=initial_epoch,
-          callbacks=callbacks)
-        
+                                 epochs=self.config[f'epochs'], steps_per_epoch=steps,
+                                 validation_data=(
+                                     dataset_val), batch_size=self.config['batch_size'], initial_epoch=initial_epoch,
+                                 callbacks=callbacks)
+
         return history
 
-            
-        
-        
+
 class CapsNet(Model):
     """
     A class used to manage the original CapsNet architecture.
-    
+
     ...
-    
+
     Attributes
     ----------
     model_name: str
@@ -206,7 +225,7 @@ class CapsNet(Model):
     verbose: bool
     n_routing: int
         number of routing interations
-    
+
     Methods
     -------
     load_graph():
@@ -214,43 +233,49 @@ class CapsNet(Model):
     train():
         train the constructed network with a given dataset. All train hyperparameters are defined in the configuration file
     """
+
     def __init__(self, model_name, mode='test', config_path='config.json', custom_path=None, verbose=True, n_routing=3):
-        Model.__init__(self, model_name, mode, config_path, verbose)   
+        Model.__init__(self, model_name, mode, config_path, verbose)
         self.n_routing = n_routing
         self.load_config()
         if custom_path != None:
             self.model_path = custom_path
         else:
-            self.model_path = os.path.join(self.config['saved_model_dir'], f"efficient_capsnet_{self.model_name}.h5")
-        self.model_path_new_train = os.path.join(self.config['saved_model_dir'], f"original_capsnet_{self.model_name}_new_train.h5")
-        self.tb_path = os.path.join(self.config['tb_log_save_dir'], f"original_capsnet_{self.model_name}")
+            self.model_path = os.path.join(
+                self.config['saved_model_dir'], f"efficient_capsnet_{self.model_name}.h5")
+        self.model_path_new_train = os.path.join(
+            self.config['saved_model_dir'], f"original_capsnet_{self.model_name}_new_train.h5")
+        self.tb_path = os.path.join(
+            self.config['tb_log_save_dir'], f"original_capsnet_{self.model_name}")
         self.load_graph()
 
-    
     def load_graph(self):
         if self.model_name == 'MNIST':
-            self.model = original_capsnet_graph_mnist.build_graph(self.config['MNIST_INPUT_SHAPE'], self.mode, self.n_routing, self.verbose)
+            self.model = original_capsnet_graph_mnist.build_graph(
+                self.config['MNIST_INPUT_SHAPE'], self.mode, self.n_routing, self.verbose)
         elif self.model_name == 'PATCH_CAMELYON':
-            self.model = original_capsnet_graph_patch_camelyon.build_graph(self.config['PATCH_CAMELYON_INPUT_SHAPE'], 2, self.mode, self.n_routing, self.verbose)
-        
+            self.model = original_capsnet_graph_patch_camelyon.build_graph(
+                self.config['PATCH_CAMELYON_INPUT_SHAPE'], 2, self.mode, self.n_routing, self.verbose)
+
     def train(self, dataset=None, initial_epoch=0):
-        callbacks = get_callbacks(self.tb_path, self.model_path_new_train, self.config['lr_dec'], self.config['lr'])
-        
+        callbacks = get_callbacks(
+            self.tb_path, self.model_path_new_train, self.config['lr_dec'], self.config['lr'])
+
         if dataset == None:
-            dataset = Dataset(self.model_name, self.config_path)          
-        dataset_train, dataset_val = dataset.get_tf_data()   
-        print(dataset_train)
+            dataset = Dataset(self.model_name, self.config_path)
+        dataset_train, dataset_val = dataset.get_tf_data()
 
         self.model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=self.config['lr']),
-              loss=[marginLoss, 'mse'],
-              loss_weights=[1., self.config['lmd_gen']],
-              metrics=['accuracy'])
+                           loss=[marginLoss, 'mse'],
+                           loss_weights=[1., self.config['lmd_gen']],
+                           metrics=['accuracy'])
 
         print('-'*30 + f'{self.model_name} train' + '-'*30)
 
         history = self.model.fit(dataset_train,
-          epochs=self.config['epochs'],
-          validation_data=(dataset_val), batch_size=self.config['batch_size'], initial_epoch=initial_epoch,
-          callbacks=callbacks)
-        
+                                 epochs=self.config['epochs'],
+                                 validation_data=(
+                                     dataset_val), batch_size=self.config['batch_size'], initial_epoch=initial_epoch,
+                                 callbacks=callbacks)
+
         return history

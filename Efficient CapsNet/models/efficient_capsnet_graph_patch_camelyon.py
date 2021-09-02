@@ -88,7 +88,7 @@ def generator_graph(input_shape):
     x = tf.keras.layers.Conv2D(filters=128, kernel_size=(3,3), padding="valid", activation=tf.nn.leaky_relu)(x)
     x = tf.keras.layers.UpSampling2D(size=(2,2), interpolation='bilinear')(x)
     x = tf.keras.layers.Conv2D(filters=128, kernel_size=(3,3), padding="valid", activation=tf.nn.leaky_relu)(x)
-    x = tf.keras.layers.Conv2D(filters=1, kernel_size=(3,3), padding="valid", activation=tf.nn.sigmoid)(x)         
+    x = tf.keras.layers.Conv2D(filters=3, kernel_size=(3,3), padding="valid", activation=tf.nn.sigmoid)(x)         
     
     return tf.keras.Model(inputs=inputs, outputs=x, name='Generator')
 

@@ -1,5 +1,6 @@
 import os
-import re  # for regular expressions
+import re
+import shutil  # for regular expressions
 import sys
 import time
 
@@ -8,6 +9,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 from tensorflow.python import debug as tf_debug  # for debugging
+from stat import S_ISREG, ST_CTIME, ST_MODE # to sort files in directory by date
 
 import src.datasets.dataset_factories as dsFactories
 import src.models.metrics as met
@@ -507,6 +509,226 @@ class EMNet(object):
         sess_val.close()
         sys.exit()
 
+    def test(self):
+        
+        # Directories
+        # Get name
+        split = self.load_dir.split('/')
+        if split[-1]:
+            name = split[-1]
+        else:
+            name = split[-2]
+
+        # Get parent directory
+        split = self.load_dir.split("/" + name)
+        parent_dir = split[0]
+
+        test_dir = '{}/{}/test'.format(parent_dir, name)
+        test_summary_dir = test_dir + '/summary'
+
+        # Clear the test log directory
+        if (FLAGS.reset is True) and os.path.exists(test_dir):
+            shutil.rmtree(test_dir)
+        if not os.path.exists(test_summary_dir):
+            os.makedirs(test_summary_dir)
+
+        # Logger
+        conf.setup_logger(logger_dir=test_dir, name="logger_test.txt")
+        logger.info("name: " + name)
+        logger.info("parent_dir: " + parent_dir)
+        logger.info("test_dir: " + test_dir)
+
+        # Load hyperparameters from train run
+        conf.load_or_save_hyperparams()
+
+        # Get dataset hyperparameters
+        logger.info('Using dataset: {}'.format(FLAGS.dataset))
+
+        # Dataset
+        dataset_size_test = conf.get_dataset_size_test(FLAGS.dataset)
+        num_classes = conf.get_num_classes(FLAGS.dataset)
+        create_inputs_test = conf.get_create_inputs(FLAGS.dataset, mode="test")
+
+        # ----------------------------------------------------------------------------
+        # GRAPH - TEST
+        # ----------------------------------------------------------------------------
+        logger.info('BUILD TEST GRAPH')
+        g_test = tf.Graph()
+        with g_test.as_default():
+            # Get global_step
+            global_step = tf.train.get_or_create_global_step()
+
+            num_batches_test = int(dataset_size_test / FLAGS.batch_size)
+
+            # Get data
+            input_dict = create_inputs_test()
+            batch_x = input_dict['image']
+            batch_labels = input_dict['label']
+
+            # AG 10/12/2018: Split batch for multi gpu implementation
+            # Each split is of size FLAGS.batch_size / FLAGS.num_gpus
+            # See: https://github.com/naturomics/CapsNet-
+            # Tensorflow/blob/master/dist_version/distributed_train.py
+            splits_x = tf.split(
+                axis=0,
+                num_or_size_splits=FLAGS.num_gpus,
+                value=batch_x)
+            splits_labels = tf.split(
+                axis=0,
+                num_or_size_splits=FLAGS.num_gpus,
+                value=batch_labels)
+
+            # Build architecture
+            build_arch = conf.get_dataset_architecture(FLAGS.dataset)
+
+            # --------------------------------------------------------------------------
+            # MULTI GPU - TEST
+            # --------------------------------------------------------------------------
+            # Calculate the logits for each model tower
+            tower_logits = []
+            reuse_variables = None
+            for i in range(FLAGS.num_gpus):
+                with tf.device('/gpu:%d' % i):
+                    with tf.name_scope('tower_%d' % i) as scope:
+                        with slim.arg_scope([slim.variable], device='/cpu:0'):
+                            loss, logits = tower_fn(
+                                build_arch,
+                                splits_x[i],
+                                splits_labels[i],
+                                scope,
+                                num_classes,
+                                reuse_variables=reuse_variables,
+                                is_train=False)
+
+                        # Don't reuse variable for first GPU, but do reuse for others
+                        reuse_variables = True
+
+                        # Keep track of losses and logits across for each tower
+                        tower_logits.append(logits)
+
+                        # Loss for each tower
+                        tf.compat.v1.summary.histogram("test_logits", logits)
+
+            # Combine logits from all towers
+            logits = tf.concat(tower_logits, axis=0)
+
+            # Calculate metrics
+            test_loss = mod.spread_loss(logits, batch_labels)
+            test_acc = met.accuracy(logits, batch_labels)
+
+            # Prepare predictions and one-hot labels
+            test_probs = tf.nn.softmax(logits=logits)
+            test_labels_oh = tf.one_hot(batch_labels, num_classes)
+
+            # Group metrics together
+            # See: https://cs230-stanford.github.io/tensorflow-model.html
+            test_metrics = {'loss': test_loss,
+                            'labels': batch_labels,
+                            'labels_oh': test_labels_oh,
+                            'logits': logits,
+                            'probs': test_probs,
+                            'acc': test_acc,
+                            }
+
+            # Reset and read operations for streaming metrics go here
+            test_reset = {}
+            test_read = {}
+
+            tf.compat.v1.summary.scalar("test_loss", test_loss)
+            tf.compat.v1.summary.scalar("test_acc", test_acc)
+
+            # Saver
+            saver = tf.train.Saver(max_to_keep=None)
+
+            # Set summary op
+            test_summary = tf.compat.v1.Summary.merge_all()
+
+            # --------------------------------------------------------------------------
+            # SESSION - TEST
+            # --------------------------------------------------------------------------
+            sess_test = tf.Session(
+                config=tf.ConfigProto(allow_soft_placement=True,
+                                    log_device_placement=False),
+                graph=g_test)
+
+            # sess_test.run(tf.local_variables_initializer())
+            # sess_test.run(tf.global_variables_initializer())
+
+            summary_writer = tf.compat.v1.Summary.FileWriter(
+                test_summary_dir,
+                graph=sess_test.graph)
+
+            ckpts_to_test = []
+            load_dir_checkpoint = os.path.join(
+                FLAGS.load_dir, "train", "checkpoint")
+
+            # Evaluate the latest ckpt in dir
+            if FLAGS.ckpt_name is None:
+                latest_ckpt = tf.train.latest_checkpoint(load_dir_checkpoint)
+                ckpts_to_test.append(latest_ckpt)
+
+            # Evaluate all ckpts in dir
+            elif FLAGS.ckpt_name == "all":
+                # Get list of files in firectory and sort by date created
+                filenames = os.listdir(load_dir_checkpoint)
+                regex = re.compile(r'.*.index')
+                filenames = filter(regex.search, filenames)
+                data_ckpts = (os.path.join(load_dir_checkpoint, fn)
+                            for fn in filenames)
+                data_ckpts = ((os.stat(path), path) for path in data_ckpts)
+
+                # regular files, insert creation date
+                data_ckpts = ((stat[ST_CTIME], path) for stat, path in data_ckpts
+                            if S_ISREG(stat[ST_MODE]))
+                data_ckpts = sorted(data_ckpts)
+                # remove ".index"
+                ckpts_to_test = [path[:-6] for ctime, path in data_ckpts]
+
+            # Evaluate ckpt specified by name
+            else:
+                ckpt_name = os.path.join(load_dir_checkpoint, FLAGS.ckpt_name)
+                ckpts_to_test.append(ckpt_name)
+
+            # --------------------------------------------------------------------------
+            # MAIN LOOP
+            # --------------------------------------------------------------------------
+            # Run testing on checkpoints
+            for ckpt in ckpts_to_test:
+                saver.restore(sess_test, ckpt)
+
+                # Reset accumulators
+                accuracy_sum = 0
+                loss_sum = 0
+                sess_test.run(test_reset)
+
+                for i in range(num_batches_test):
+
+                    test_metrics_v, test_summary_str_v = sess_test.run(
+                        [test_metrics, test_summary])
+
+                    # Update
+                    accuracy_sum += test_metrics_v['acc']
+                    loss_sum += test_metrics_v['loss']
+
+                    ckpt_num = re.split('-', ckpt)[-1]
+                    logger.info('TEST ckpt-{}'.format(ckpt_num)
+                                + ' bch-{:d}'.format(i)
+                                + ' cum_acc: {:.2f}%'.format(accuracy_sum/(i+1)*100)
+                                + ' cum_loss: {:.4f}'.format(loss_sum/(i+1))
+                                )
+
+                ave_acc = accuracy_sum / num_batches_test
+                ave_loss = loss_sum / num_batches_test
+
+                logger.info('TEST ckpt-{}'.format(ckpt_num)
+                            + ' avg_acc: {:.2f}%'.format(ave_acc*100)
+                            + ' avg_loss: {:.4f}'.format(ave_loss))
+
+                logger.info("Write Test Summary")
+                summary_test = tf.compat.v1.Summary()
+                summary_test.value.add(tag="test_acc", simple_value=ave_acc)
+                summary_test.value.add(tag="test_loss", simple_value=ave_loss)
+                summary_writer.add_summary(summary_test, ckpt_num)
 
 def tower_fn(build_arch,
              x,

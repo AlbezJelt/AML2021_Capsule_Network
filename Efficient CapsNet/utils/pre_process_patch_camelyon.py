@@ -1,4 +1,6 @@
 import os
+
+from numpy.lib.function_base import extract
 from utils.pre_process_smallnorb import PATCH_SMALLNORB
 
 import numpy as np
@@ -60,7 +62,7 @@ def to_grayscale(x, y):
     return tf.image.rgb_to_grayscale(x), y
 
 
-def generate_tf_data(dataset_train, dataset_test, batch_size):
+def generate_tf_data(dataset_train, dataset_val, batch_size):
 
     # =================== TRAINING SET ========================================
 
@@ -85,8 +87,8 @@ def generate_tf_data(dataset_train, dataset_test, batch_size):
                                       num_parallel_calls=AUTOTUNE)
 
     # Convert to grayscale
-    dataset_train = dataset_train.map(
-        to_grayscale, num_parallel_calls=AUTOTUNE)
+    # dataset_train = dataset_train.map(
+    #     to_grayscale, num_parallel_calls=AUTOTUNE)
 
     # Standardize the image
     dataset_train = dataset_train.map(
@@ -107,8 +109,54 @@ def generate_tf_data(dataset_train, dataset_test, batch_size):
     # =================== VALIDATION SET ======================================
 
     # Extract image and label from tf.Dataset
+    dataset_val = dataset_val.map(
+        pre_process, num_parallel_calls=AUTOTUNE)
+
+    # Rescale to SCALE_PATCH_CAMELYON
+    dataset_val = dataset_val.map(
+        rescale, num_parallel_calls=AUTOTUNE)
+
+    # Center crop to PATCH_PATCH_CAMELYON
+    dataset_val = dataset_val.map(
+        test_patches, num_parallel_calls=AUTOTUNE)
+
+    # Convert to grayscale
+    # dataset_test = dataset_test.map(
+    #     to_grayscale, num_parallel_calls=AUTOTUNE)
+
+    # Standardize the image
+    dataset_val = dataset_val.map(
+        normalize, num_parallel_calls=AUTOTUNE)
+
+    # Create the sample (image, label), (label, image)
+    dataset_val = dataset_val.map(generator,
+                                  num_parallel_calls=AUTOTUNE)
+
+    # Cache the data in memory. This dataset is smaller compared to the
+    # training so it can be cached in memory for faster validation
+    dataset_val = dataset_val.cache()
+
+    # Batch
+    dataset_val = dataset_val.batch(16)
+
+    # Prefetch
+    dataset_val = dataset_val.prefetch(AUTOTUNE)
+
+    # =========================================================================
+
+    return dataset_train, dataset_val
+
+
+def generate_tf_test_data(dataset_test):
+
+    # Extract image and label from tf.Dataset
     dataset_test = dataset_test.map(
         pre_process, num_parallel_calls=AUTOTUNE)
+
+    # Extract only labels. Usefull to compute testing metrics
+    def extract_label(image, label): return label
+    labels = dataset_test.map(extract_label, num_parallel_calls=AUTOTUNE)
+    labels = np.stack(list(labels))
 
     # Rescale to SCALE_PATCH_CAMELYON
     dataset_test = dataset_test.map(
@@ -119,8 +167,8 @@ def generate_tf_data(dataset_train, dataset_test, batch_size):
         test_patches, num_parallel_calls=AUTOTUNE)
 
     # Convert to grayscale
-    dataset_test = dataset_test.map(
-        to_grayscale, num_parallel_calls=AUTOTUNE)
+    # dataset_test = dataset_test.map(
+    #     to_grayscale, num_parallel_calls=AUTOTUNE)
 
     # Standardize the image
     dataset_test = dataset_test.map(
@@ -129,17 +177,11 @@ def generate_tf_data(dataset_train, dataset_test, batch_size):
     # Create the sample (image, label), (label, image)
     dataset_test = dataset_test.map(generator,
                                     num_parallel_calls=AUTOTUNE)
-
-    # Cache the data in memory. This dataset is smaller compared to the
-    # training so it can be cached in memory for faster validation
-    dataset_test = dataset_test.cache()
-
+    
     # Batch
-    dataset_test = dataset_test.batch(1)
+    dataset_test = dataset_test.batch(16)
 
     # Prefetch
     dataset_test = dataset_test.prefetch(AUTOTUNE)
 
-    # =========================================================================
-
-    return dataset_train, dataset_test
+    return dataset_test, labels

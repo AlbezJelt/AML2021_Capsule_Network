@@ -7,7 +7,7 @@
     "lmd_gen": 0.392,
     "lr_dec": 0.97,
     "batch_size": 16,
-    "epochs":150,
+    "epochs":50,
     "saved_model_dir": "bin",
     "tb_log_save_dir": "logs",
     "mnist_path": "mnist.npz",
@@ -16,7 +16,7 @@
     "n_overlay_multimnist": 1000,
     "shift_multimnist": 6,
     "pad_multimnist": 4,
-    "PATCH_CAMELYON_INPUT_SHAPE": [48,48,1],
+    "PATCH_CAMELYON_INPUT_SHAPE": [48,48,3],
     "scale_patch_camelyon": 64,
     "patch_patch_camelyon": 48
 }

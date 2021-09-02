@@ -131,7 +131,7 @@ class Dataset(object):
             # Import the dataset
             (ds_train, ds_valid, ds_test), ds_info = tfds.load(
                 'patch_camelyon',
-                data_dir=f'{base_path}/data/tensorflow_datasets',
+                data_dir=f'{base_path}/data/tensorflow_dataset',
                 download=False,
                 split=['train', 'validation', 'test'],
                 shuffle_files=True,
