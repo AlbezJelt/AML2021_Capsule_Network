@@ -18,8 +18,9 @@ def get_dataset_path(dataset_name: str):
     # Go up to project root directory, ../../../
     base_path = this_file_path.parent.parent.parent
 
-    options = {'PatchCamelyon': f'{base_path}/data/tensorflow_datasets/patch_camelyon/2.0.0'}
-    path = FLAGS.storage + options[dataset_name]
+
+    options = {'PatchCamelyon': f'{base_path}/data/tensorflow_dataset/patch_camelyon/2.0.0'}
+    path = options[dataset_name]
     return path
 
 

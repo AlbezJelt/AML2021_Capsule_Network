@@ -32,29 +32,30 @@ def capsnet_graph(input_shape, num_classes, routing):
     """
     inputs = tf.keras.Input(input_shape)
 
-    x = tf.keras.layers.Conv2D(64,5,2,activation=None, padding='same', kernel_initializer='he_normal')(inputs)
-    x = tf.keras.layers.LeakyReLU()(x)
-    x = tfa.layers.InstanceNormalization(axis=3, 
-                                   center=True, 
-                                   scale=True,
-                                   beta_initializer="random_uniform",
-                                   gamma_initializer="random_uniform")(x)
-    x = tf.keras.layers.Conv2D(128,3, activation=None, padding='valid', kernel_initializer='he_normal')(x)
-    x = tf.keras.layers.LeakyReLU()(x)
-    x = tfa.layers.InstanceNormalization(axis=3, 
-                                   center=True, 
-                                   scale=True,
-                                   beta_initializer="random_uniform",
-                                   gamma_initializer="random_uniform")(x)
+    # x = tf.keras.layers.Conv2D(64,5,2,activation=None, padding='same', kernel_initializer='he_normal')(inputs)
+    # x = tf.keras.layers.LeakyReLU()(x)
+    # x = tfa.layers.InstanceNormalization(axis=3, 
+    #                                center=True, 
+    #                                scale=True,
+    #                                beta_initializer="random_uniform",
+    #                                gamma_initializer="random_uniform")(x)
+    # x = tf.keras.layers.Conv2D(128,3, activation=None, padding='valid', kernel_initializer='he_normal')(x)
+    # x = tf.keras.layers.LeakyReLU()(x)
+    # x = tfa.layers.InstanceNormalization(axis=3, 
+    #                                center=True, 
+    #                                scale=True,
+    #                                beta_initializer="random_uniform",
+    #                                gamma_initializer="random_uniform")(x)
 
-    x = tf.keras.layers.Conv2D(256,3, activation=None, padding='valid', kernel_initializer='he_normal')(x)
-    x = tf.keras.layers.LeakyReLU()(x)
-    x = tfa.layers.InstanceNormalization(axis=3, 
-                                   center=True, 
-                                   scale=True,
-                                   beta_initializer="random_uniform",
-                                   gamma_initializer="random_uniform")(x)
+    # x = tf.keras.layers.Conv2D(256,3, activation=None, padding='valid', kernel_initializer='he_normal')(x)
+    # x = tf.keras.layers.LeakyReLU()(x)
+    # x = tfa.layers.InstanceNormalization(axis=3, 
+    #                                center=True, 
+    #                                scale=True,
+    #                                beta_initializer="random_uniform",
+    #                                gamma_initializer="random_uniform")(x)
 
+    x = tf.keras.layers.Conv2D(256, 9, activation="relu")(inputs)
     primary = PrimaryCaps(C=32, L=8, k=9, s=2)(x)
     digit_caps = DigitCaps(num_classes, 16, routing=routing)(primary)  
     digit_caps_len = Length(name='capsnet_output_len')(digit_caps)

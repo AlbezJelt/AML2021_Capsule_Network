@@ -43,7 +43,7 @@ class EMNet(object):
         tf.compat.v1.set_random_seed(1234)
 
         # Directories
-        self.train_dir, self.train_summary_dir = conf.setup_train_directories()
+        self.train_dir, self.train_summary_dir = conf.setup_train_directories(model_name)
 
         # Logger
         conf.setup_logger(logger_dir=self.train_dir, name="logger_train.txt")

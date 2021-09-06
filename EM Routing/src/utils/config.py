@@ -31,7 +31,7 @@ flags.DEFINE_string('f', '', 'kernel')
 # set to 64 according to authors (https://openreview.net/forum?id=HJWLfGWRb)
 flags.DEFINE_integer('batch_size', 32, 'batch size in total across all gpus')
 flags.DEFINE_integer('epoch', 2000, 'epoch')
-flags.DEFINE_integer('iter_routing', 3, 'number of iterations')
+flags.DEFINE_integer('iter_routing', 2, 'number of iterations')
 flags.DEFINE_integer('num_gpus', 1, 'number of GPUs')
 flags.DEFINE_float('epsilon', 1e-9, 'epsilon')
 flags.DEFINE_float('lrn_rate', 3e-3, 'learning rate to use in Adam optimiser')
@@ -72,7 +72,7 @@ flags.DEFINE_string('params_path', None, 'path to JSON containing parameters')
 
 this_file_path = pathlib.Path(__file__).parent.resolve()
 LOCAL_STORAGE = this_file_path.parent.parent
-flags.DEFINE_string('storage', LOCAL_STORAGE,
+flags.DEFINE_string('storage', str(LOCAL_STORAGE),
                     'directory where logs and data are stored')
                     
 flags.DEFINE_string('db_name', 'capsules_ex1',
@@ -85,12 +85,12 @@ FLAGS = flags.FLAGS
 # ------------------------------------------------------------------------------
 # DIRECTORIES
 # ------------------------------------------------------------------------------
-def setup_train_directories():
+def setup_train_directories(model_name):
 
     # Set log directory
     date_stamp = datetime.now().strftime('%Y%m%d')
     save_dir = os.path.join(tf.app.flags.FLAGS.storage, 'logs/',
-                            tf.app.flags.FLAGS.dataset)
+                            model_name)
     train_dir = '{}/{}_{}/train'.format(save_dir, date_stamp, FLAGS.name)
 
     # Clear the train log directory
