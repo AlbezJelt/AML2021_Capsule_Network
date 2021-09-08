@@ -155,7 +155,7 @@ class EfficientCapsNet(Model):
             self.model_path = os.path.join(
                 self.config['saved_model_dir'], f"efficient_capsnet_{self.model_name}.h5")
         self.model_path_new_train = os.path.join(
-            self.config['saved_model_dir'], f"original_capsnet_{self.model_name}_new_train.h5")
+            self.config['saved_model_dir'], f"efficient_capsnet_{self.model_name}_new_train.h5")
         self.tb_path = os.path.join(
             self.config['tb_log_save_dir'], f"efficient_capsnet_{self.model_name}")
         self.load_graph()
