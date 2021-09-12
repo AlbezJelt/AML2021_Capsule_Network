@@ -46,7 +46,7 @@ class Dataset(object):
         get a tf.data.Dataset object of the loaded dataset. 
     """
 
-    def __init__(self, model_name, config_path='config.json'):
+    def __init__(self, model_name, config_path='config.json', isTest=None):
         self.model_name = model_name
         self.config_path = config_path
         self.config = None
@@ -59,6 +59,8 @@ class Dataset(object):
 
         self.tf_train = None
         self.tf_valid = None
+        self.tf_test = None
+        self.isTest = isTest
 
         self.load_config()
         self.get_dataset()
@@ -134,13 +136,14 @@ class Dataset(object):
                 data_dir=f'{base_path}/data/tensorflow_dataset',
                 download=False,
                 split=['train', 'validation', 'test'],
-                shuffle_files=True,
+                shuffle_files=not self.isTest,  # Needed because when testing the model we need to extract the labels first to compute metrics. This exaust and restart the dataset, but if shuffle_files=True the labels index will mismatch!
                 as_supervised=False,
                 with_info=True)
 
             # Save directly dataset in tf.data.Dataset to save memory
             self.tf_train = ds_train
             self.tf_valid = ds_valid
+            self.tf_test = ds_test
             self.class_names = ds_info.features['label'].names
             print("[INFO] Dataset loaded!")
 

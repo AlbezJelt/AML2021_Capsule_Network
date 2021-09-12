@@ -78,18 +78,23 @@ class Model(object):
             print("[ERRROR] Graph Weights not found")
 
     def predict(self, dataset_test):
+        if self.model_name == "PATCH_CAMELYON":
+            dataset_test = pre_process_patch_camelyon.generate_tf_test_data(dataset_test)
         return self.model.predict(dataset_test)
 
-    def evaluate(self, X_test, y_test):
+    def evaluate(self, X_test, y_test=None):
         print('-'*30 + f'{self.model_name} Evaluation' + '-'*30)
 
-        if type(X_test) == tf.data.Dataset:
+        if "tensorflow.python.data.ops.dataset_ops.PrefetchDataset" in str(type(X_test)):
             if self.model_name == "PATCH_CAMELYON":
-                testset, y_test = pre_process_patch_camelyon.generate_tf_test_data(
+                testset = pre_process_patch_camelyon.generate_tf_test_data(
                     X_test)
+
+                # Extract the lables first to compute metrics
+                y_test = np.concatenate([label for img, label in testset], axis=0)
+
                 y_pred, X_gen = self.model.predict(testset)
-                acc = np.sum(np.argmax(y_pred, 1) ==
-                             np.argmax(y_test, 1))/y_test.shape[0]
+                acc = np.sum(np.argmax(y_pred, 1) == np.argmax(y_test, 1))/y_test.shape[0]
 
         else:
             if self.model_name == "MULTIMNIST":
@@ -242,7 +247,7 @@ class CapsNet(Model):
             self.model_path = custom_path
         else:
             self.model_path = os.path.join(
-                self.config['saved_model_dir'], f"efficient_capsnet_{self.model_name}.h5")
+                self.config['saved_model_dir'], f"original_capsnet_{self.model_name}.h5")
         self.model_path_new_train = os.path.join(
             self.config['saved_model_dir'], f"original_capsnet_{self.model_name}_new_train.h5")
         self.tb_path = os.path.join(

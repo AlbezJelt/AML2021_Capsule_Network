@@ -153,11 +153,6 @@ def generate_tf_test_data(dataset_test):
     dataset_test = dataset_test.map(
         pre_process, num_parallel_calls=AUTOTUNE)
 
-    # Extract only labels. Usefull to compute testing metrics
-    def extract_label(image, label): return label
-    labels = dataset_test.map(extract_label, num_parallel_calls=AUTOTUNE)
-    labels = np.stack(list(labels))
-
     # Rescale to SCALE_PATCH_CAMELYON
     dataset_test = dataset_test.map(
         rescale, num_parallel_calls=AUTOTUNE)
@@ -175,13 +170,13 @@ def generate_tf_test_data(dataset_test):
         normalize, num_parallel_calls=AUTOTUNE)
 
     # Create the sample (image, label), (label, image)
-    dataset_test = dataset_test.map(generator,
-                                    num_parallel_calls=AUTOTUNE)
+    # dataset_test = dataset_test.map(generator,
+    #                                 num_parallel_calls=AUTOTUNE)
     
     # Batch
-    dataset_test = dataset_test.batch(16)
+    dataset_test = dataset_test.batch(32)
 
     # Prefetch
     dataset_test = dataset_test.prefetch(AUTOTUNE)
 
-    return dataset_test, labels
+    return dataset_test
