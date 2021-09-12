@@ -23,16 +23,16 @@ def load_train_val_dataset():
 
 
 def load_test_dataset():
-    ds_test, ds_info = tfds.load(
+    (ds_test), ds_info = tfds.load(
         'patch_camelyon',
         data_dir=f'{base_path}/data/tensorflow_dataset',
         download=False,
         split=['test'],
-        shuffle_files=True,
+        shuffle_files=False,
         as_supervised=False,
         with_info=True)
 
-    return ds_test
+    return ds_test[0]
 
 
 def preprocess_train(ds_train, batch_size):
@@ -91,7 +91,7 @@ def preprocess_validation(ds_val):
     ds_val = ds_val.cache()
 
     # Batch
-    ds_val = ds_val.batch(16)
+    ds_val = ds_val.batch(32)
 
     # Prefetch
     ds_val = ds_val.prefetch(AUTOTUNE)
