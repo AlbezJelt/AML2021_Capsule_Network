@@ -539,15 +539,15 @@ class EMNet(object):
         logger.info("test_dir: " + test_dir)
 
         # Load hyperparameters from train run
-        conf.load_or_save_hyperparams()
+        conf.load_or_save_hyperparams(train_dir=None, load_dir=self.load_dir)
 
         # Get dataset hyperparameters
-        logger.info('Using dataset: {}'.format(FLAGS.dataset))
+        logger.info('Using dataset: {}'.format(self.model_name))
 
         # Dataset
-        dataset_size_test = conf.get_dataset_size_test(FLAGS.dataset)
-        num_classes = conf.get_num_classes(FLAGS.dataset)
-        create_inputs_test = conf.get_create_inputs(FLAGS.dataset, mode="test")
+        dataset_size_test = dsFactories.get_dataset_size_test(self.model_name)
+        num_classes = dsFactories.get_num_classes(self.model_name)
+        create_inputs_test = dsFactories.get_create_inputs(self.model_name, mode="test")
 
         # ----------------------------------------------------------------------------
         # GRAPH - TEST
@@ -579,7 +579,7 @@ class EMNet(object):
                 value=batch_labels)
 
             # Build architecture
-            build_arch = conf.get_dataset_architecture(FLAGS.dataset)
+            build_arch = dsFactories.get_dataset_architecture(self.model_name)
 
             # --------------------------------------------------------------------------
             # MULTI GPU - TEST
@@ -641,7 +641,7 @@ class EMNet(object):
             saver = tf.train.Saver(max_to_keep=None)
 
             # Set summary op
-            test_summary = tf.compat.v1.Summary.merge_all()
+            test_summary = tf.compat.v1.summary.merge_all()
 
             # --------------------------------------------------------------------------
             # SESSION - TEST
@@ -654,13 +654,13 @@ class EMNet(object):
             # sess_test.run(tf.local_variables_initializer())
             # sess_test.run(tf.global_variables_initializer())
 
-            summary_writer = tf.compat.v1.Summary.FileWriter(
+            summary_writer = tf.compat.v1.summary.FileWriter(
                 test_summary_dir,
                 graph=sess_test.graph)
 
             ckpts_to_test = []
             load_dir_checkpoint = os.path.join(
-                FLAGS.load_dir, "train", "checkpoint")
+                self.load_dir, "train", "checkpoint")
 
             # Evaluate the latest ckpt in dir
             if FLAGS.ckpt_name is None:
