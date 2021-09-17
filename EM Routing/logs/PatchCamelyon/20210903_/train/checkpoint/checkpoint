@@ -1,0 +1,2 @@
+model_checkpoint_path: "/workspaces/Capsule-Network-Tests/EM Routing/logs/PatchCamelyon/20210903_/train/checkpoint/model.ckpt-565348"
+all_model_checkpoint_paths: "/workspaces/Capsule-Network-Tests/EM Routing/logs/PatchCamelyon/20210903_/train/checkpoint/model.ckpt-565348"

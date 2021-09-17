@@ -132,5 +132,3 @@ dmypy.json
 data/tensorflow_dataset/patch_camelyon
 
 Efficient CapsNet/logs
-EM Routing/logs
-EM Routing/EM Routing/logs/PatchCamelyon/20210903_/test/logger_test.txt
