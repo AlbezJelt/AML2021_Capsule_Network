@@ -7,13 +7,13 @@ This folder contains a modified version of <a href="https://github.com/EscVM/Eff
 There are two ways to prepare an environment with the required package:
 
 ## 1.1 Docker container
-It's the **raccomanded way** because it doesn't require to manually install any python package (even python itself isn't needed) and any Nvida CUDA toolkit (potentially messing up installation between different version, compatibility problems etc.) 
+It's the **reccomended way** because it doesn't require to manually install any python package (even python itself isn't needed) and any Nvida CUDA toolkit (potentially messing up installation between different version, compatibility problems etc.) 
 1. Install Docker following the [official guide](https://docs.docker.com/get-docker/).
 
 2. For GPU support on Linux (and WSL2 in the future) [install NVIDIA Docker support](https://github.com/NVIDIA/nvidia-docker).
 
 3. Now you can procede in two different ways:
-    * (**Raccomanded**) Open the project folder with Visual Studio Code, install the [Remote Development](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.vscode-remote-extensionpack) extension, than press F1 to show all commands, find and select Remote-Containers: Reopen in Container.
+    * (**Reccomended**) Open the project folder with Visual Studio Code, install the [Remote Development](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.vscode-remote-extensionpack) extension, than press F1 to show all commands, find and select Remote-Containers: Reopen in Container.
     * Or build and run the docker image manually.
       ```bash
       docker build -t EffCapsNet .

@@ -25,4 +25,4 @@ Tensorflow_dataset provide a [very interesting playground](https://knowyourdata-
    ```
 
 ## Installation
-the various models require different versions of the same packages in order to run. Please refer to READMEs in dedicated folders (Efficient CapsNet and EM Routing).
+Provided models require different versions of the same packages in order to run. Please refer to READMEs in dedicated folders (Efficient CapsNet and EM Routing).
